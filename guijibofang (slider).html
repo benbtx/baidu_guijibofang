@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Track</title>
+    <style type="text/css">
+        html {
+            height: 100%
+        }
+        
+        body {
+            height: 100%;
+            margin: 0px;
+            padding: 0px
+        }
+        
+        #controller {
+            width: 100%;
+            border-bottom: 3px outset;
+            height: 30px;
+            filter: alpha(Opacity=100);
+            -moz-opacity: 1;
+            opacity: 1;
+            z-index: 10000;
+            background-color: lightblue;
+        }
+        
+        #container {
+            height: 100%
+        }
+        
+        .control-gjcontrol {
+            position: absolute;
+            bottom: 80px;
+            left: 80px;
+            z-index: 8;
+            width: calc(100% - 160px);
+            height: 80px;
+            background: white;
+            border: 1px solid #eee;
+        }
+        
+        .el-slider__runway {
+            width: 100%;
+            height: 10px;
+            border-bottom: 1px solid #b75b5b;
+            border-left: 1px solid #b75b5b;
+            border-right: 1px solid #b75b5b;
+            margin: 0 auto;
+        }
+        
+        .el-slider__bar {}
+        
+        .el-slider__stop {
+            width: 100%;
+            position: absolute;
+        }
+        
+        .kd {
+            display: inline-block;
+            width: 1px;
+            height: 3px;
+            position: absolute;
+            top: 7px;
+            background: black;
+            left:16.67%
+        }
+        
+        .kd2 {
+            display: inline-block;
+            width: 1px;
+            height: 3px;
+            position: absolute;
+            top: 7px;
+            background: black;
+            left:33.3%
+        }
+        .kd3 {
+            display: inline-block;
+            width: 1px;
+            height: 3px;
+            position: absolute;
+            top: 7px;
+            background: black;
+            left:50%
+        }
+        .kd4 {
+            display: inline-block;
+            width: 1px;
+            height: 3px;
+            position: absolute;
+            top: 7px;
+            background: black;
+            left:70%
+        }
+        .kd5 {
+            display: inline-block;
+            width: 1px;
+            height: 3px;
+            position: absolute;
+            top: 7px;
+            background: black;
+            left:84%
+        } 
+        .kd6 {
+            display: inline-block;
+            width: 1px;
+            height: 3px;
+            position: absolute;
+            top: 7px;
+            background: black;
+            left:100%
+        }
+        
+        .btna {
+            width: 10px;
+            height: 10px;
+            text-align: center;
+            border-radius: 5px;
+            position: absolute;
+            top: 27px;
+            left:0%;
+            background-color: darkcyan
+        }
+        
+        .btnb {
+            width: 10px;
+            height: 10px;
+            text-align: center;
+            border-radius: 5px;
+            position: absolute;
+            top: 27px;
+            left:50%;
+            background-color: darkcyan
+        }
+    </style>
+    <script type="text/javascript" src="http://api.map.baidu.com/api?v=2.0&ak=nXFlgoCpDN3D7TiOOUGGwwlHGlircdez"></script>
+    <script type="text/javascript">
+        //获取所有点的坐标
+        var points = [
+            new BMap.Point(114.00100, 22.550000), new BMap.Point(114.00130, 22.550000),
+            new BMap.Point(114.00160, 22.550000), new BMap.Point(114.00200, 22.550000),
+            new BMap.Point(114.00300, 22.550500), new BMap.Point(114.00400, 22.550000),
+            new BMap.Point(114.00500, 22.550000), new BMap.Point(114.00505, 22.549800),
+            new BMap.Point(114.00510, 22.550000), new BMap.Point(114.00515, 22.550000),
+            new BMap.Point(114.00525, 22.550400), new BMap.Point(114.00537, 22.549500)
+        ];
+
+        var map; //百度地图对象
+        var car; //汽车图标
+        var label; //信息标签
+        var centerPoint;
+
+        var timer; //定时器
+        var index = 0; //记录播放到第几个point
+
+        var followChk, playBtn, pauseBtn, resetBtn; //几个控制按钮
+
+        function init() {
+            followChk = document.getElementById("follow");
+            playBtn = document.getElementById("play");
+            pauseBtn = document.getElementById("pause");
+            resetBtn = document.getElementById("reset");
+
+            //初始化地图,选取第一个点为起始点
+            map = new BMap.Map("container");
+            map.centerAndZoom(points[0], 15);
+            map.enableScrollWheelZoom();
+            map.addControl(new BMap.NavigationControl());
+            map.addControl(new BMap.ScaleControl());
+            map.addControl(new BMap.OverviewMapControl({
+                isOpen: true
+            }));
+
+            //通过DrivingRoute获取一条路线的point
+            var driving = new BMap.DrivingRoute(map);
+            driving.search(new BMap.Point(114.00100, 22.550000), new BMap.Point(113.95100, 22.550000));
+            driving.setSearchCompleteCallback(function() {
+                //得到路线上的所有point
+                // points = driving.getResults().getPlan(0).getRoute(0).getPath();
+                //画面移动到起点和终点的中间
+                centerPoint = new BMap.Point((points[0].lng + points[points.length - 1].lng) / 2, (points[0].lat + points[points.length - 1].lat) / 2);
+                map.panTo(centerPoint);
+                //连接所有点
+                map.addOverlay(new BMap.Polyline(points, {
+                    strokeColor: "black",
+                    strokeWeight: 5,
+                    strokeOpacity: 1
+                }));
+
+                //显示小车子
+                label = new BMap.Label("", {
+                    offset: new BMap.Size(-20, -20)
+                });
+                car = new BMap.Marker(points[0]);
+                car.setLabel(label);
+                map.addOverlay(car);
+
+                //点亮操作按钮
+                playBtn.disabled = false;
+                resetBtn.disabled = false;
+            });
+        }
+        setTimeout(function() {
+            this.init()
+        }, 3000)
+
+
+        function play() {
+            playBtn.disabled = true;
+            pauseBtn.disabled = false;
+
+            var point = points[index];
+            if (index > 0) {
+                map.addOverlay(new BMap.Polyline([points[index - 1], point], {
+                    strokeColor: "red",
+                    strokeWeight: 1,
+                    strokeOpacity: 1
+                }));
+            }
+            label.setContent("经度: " + point.lng + "<br>纬度: " + point.lat);
+            car.setPosition(point);
+            index++;
+            if (followChk.checked) {
+                map.panTo(point);
+            }
+            if (index < points.length) {
+                timer = window.setTimeout("play(" + index + ")", 200);
+            } else {
+                playBtn.disabled = true;
+                pauseBtn.disabled = true;
+                map.panTo(point);
+            }
+        }
+
+        function pause() {
+            playBtn.disabled = false;
+            pauseBtn.disabled = true;
+
+            if (timer) {
+                window.clearTimeout(timer);
+            }
+        }
+
+        function reset() {
+            followChk.checked = false;
+            playBtn.disabled = false;
+            pauseBtn.disabled = true;
+
+            if (timer) {
+                window.clearTimeout(timer);
+            }
+            index = 0;
+            car.setPosition(points[0]);
+            map.panTo(centerPoint);
+        }
+
+
+
+
+
+        
+        var kd=422.8;//时间轴控件的长度  
+        setTimeout(() => {
+           var domsjz = document.querySelector(".control-gjcontrol"),
+           sjzcss = window.getComputedStyle(domsjz, null); 
+           // kd= getStyle(this.$refs.slider, "width")
+           kd=parseFloat(sjzcss.width);
+           console.log('宽度：'+kd);
+        }, 4000);
+        var d=[{
+         value:16.6
+        },{
+            value:32
+        },{
+            value:50
+        },{
+            value:66.7
+        },{
+            value:84
+        },{
+            value:100
+        }];
+        var dgs=6;//当前轨迹点个数
+
+        var startX;
+        var diff;
+        var currentposition;
+        var currentposition_max;
+        var currentposition_min;
+        var currentposition_max;
+
+        var newpoistion;
+
+
+        function onButtonDown(e,target){
+            // this.onDragStart(e);
+            startX = event.clientX;
+            console.log('开始位置：'+startX)
+            currentposition=target=='0'?0:6;//按最小的按钮则当前位置为坐标点开始，否则为最后一个坐标点
+            window.addEventListener('mousemove', this.onDragging);
+       
+            window.addEventListener('mouseup', this.onDragEnd);
+        }
+
+
+        function onDragging(e){
+
+            var domsjz = document.querySelector(".control-gjcontrol"),
+           sjzcss = window.getComputedStyle(domsjz, null); 
+           // kd= getStyle(this.$refs.slider, "width")
+           kd=parseFloat(sjzcss.width);
+
+
+            console.log('宽度：'+kd)
+            // console.log(event);
+            console.log('移动位置：'+event.clientX)
+            diff=((event.clientX-startX) /kd)* dgs ;//
+             // (鼠标当前位置 - 鼠标起始位置) / 总长 * 数值范围 = 变化的值 <=> (变化的值 / 数值范围) = (鼠标当前位置 - 鼠标起始位置) / 总长
+           //diff在-1到1 之间变化。1表示移动到下一个位置，-1移动到上一个位置。
+           console.log('偏移比例：'+diff)
+           //设置新位置
+           newpoistion=currentposition+diff;
+           if(newpoistion<0){
+            console.log('起始位置不能再往左移动！')
+           }
+           if(newpoistion>kd){
+            console.log('结束位置不能再往右移动！')
+           }
+
+           var btna = document.querySelector(".btna"),
+           btnacss = window.getComputedStyle(btna, null); 
+        //    console.log( '偏移位置：'+(kd/dgs)*diff+'px');
+        //    if(diff>=1){
+        //        //更新坐标 移到下一个坐标
+        //        currentposition=currentposition+parseInt(diff);
+        //        if(currentposition>d.length){return}
+        //        btna.style.left=d[currentposition].value+'%'
+
+        //     }
+        //     if(diff<0&&diff>-1){
+        //        //更新坐标 移到上一个坐标
+        //        if(currentposition<0){return}
+        //        currentposition=currentposition-1;
+        //        btna.style.left=d[currentposition].value+'%'
+        //     //    btnacss.left=currentposition/6*100% 
+               
+        //     }
+           
+
+
+           //  console.log( parseFloat(btnacss.left)+kd/dgs*diff+'px');
+           btna.style.left=parseFloat((event.clientX-startX)/kd*100,1)+'%';
+        //    btna.style.left= parseFloat(btnacss.left)+(kd/dgs)*diff+'px';
+           
+            // document.querySelector('.btna').style.left= document.querySelector('.btna').style.left;
+           //+(diff*16.6)*100%
+
+
+           
+           
+
+        }
+
+
+
+        function onDragEnd(e){
+            console.log(event);
+            event.clientX-startX;
+            window.removeEventListener('mousemove', this.onDragging);
+        
+            window.removeEventListener('mouseup', this.onDragEnd);
+          
+        }
+
+
+        //获取元素的宽度 getStyle(this.$refs.slider, "width")
+        function getStyle (element, styleName) {
+            if (!element || !styleName) return null;
+            styleName = camelCase(styleName);
+            if (styleName === 'float') {
+                styleName = 'cssFloat';
+            }
+            try {
+                const computed = document.defaultView.getComputedStyle(element, '');
+                return element.style[styleName] || computed ? computed[styleName] : null;
+            } catch(e) {
+                return element.style[styleName];
+            }
+         }
+
+
+    </script>
+</head>
+
+<body οnlοad="init();">
+    <div id="controller" align="center">
+        <input id="follow" type="checkbox"><span style="font-size:12px;">画面跟随</span></input>
+        <button id="play" onclick="play()">播放</button>
+        <button id="pause" onclick="pause()">暂停</button>
+        <button id="reset" onclick="reset()">重置</button>
+
+        <!-- <button id="play" type="button" value="播放" onclick="play();"></button>
+        <button id="pause" type="button" value="暂停" onclick="pause();"></button>
+        <button id="reset" type="button" value="重置" onclick="reset()"></button> -->
+    </div>
+    <div id="container">
+
+    </div>
+    <div class='control-gjcontrol'>sdf
+        <!-- //滑块轨道 -->
+        <div class="el-slider__runway">
+           <!-- <div style="width:100%;height: 100%;">  -->
+                    <!-- 已经滑过的轨道 -->
+                <div class="el-slider__bar" :style="barStyle">
+                </div>
+                <!-- 滑块轨道的间断点 -->
+                <div class="el-slider__stop">
+                    <span class="kd"> </span>
+                    <span class="kd2"></span>
+                    <span class="kd3"></span>
+                    <span class="kd4"></span>
+                    <span class="kd5"></span>
+                    <span class="kd6"></span>
+                </div>
+           <!-- </div> -->
+            <!-- 第一个滑块按钮 -->
+            <div class='btna' onmousedown="onButtonDown(this,'0')"></div>
+            <!-- 第二个滑块按钮 -->
+            <div class='btnb' onmousedown="onButtonDown(this,'6')"></div>
+           
+
+        </div>
+
+    </div>
+
+</body>
+
+</html>
