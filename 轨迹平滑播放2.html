@@ -1,0 +1,193 @@
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>多图标平滑移动 - 轨迹回放</title>
+    <style type="text/css">
+        body, html{width: 100%;height: 100%;margin:0;font-family:"微软雅黑";}
+        #map_canvas{width:100%;height:500px;}
+        #result {width:100%}
+    </style>
+    <script src="http://api.map.baidu.com/api?v=2.0&ak=RKVMcKG7V23ABjbKnvOGyjY5GGaj0eLL"></script>
+</head>
+<body>
+<div id="map_canvas"></div>
+<div id="result"></div>
+<button onclick="nextOne()">下一个</button>
+<script>
+    var pointArr = [
+        {
+            123:{lng:"116.379341",lat:"39.938776"},
+            124:{lng:"116.402625",lat:"39.943091"},
+            125:{lng:"116.373807",lat:"39.953103"},
+            126:{lng:"116.40011",lat:"39.958357"},
+            127:{lng:"116.408518",lat:"39.958025"},
+            128:{lng:"116.364537",lat:"39.943755"}
+        },
+        {
+            123:{lng:"116.379628",lat:"39.935125"},
+            124:{lng:"116.403487",lat:"39.94027"},
+            125:{lng:"116.38509",lat:"39.955315"},
+            126:{lng:"116.392924",lat:"39.958357"},
+            127:{lng:"116.392924",lat:"39.957804"},
+            128:{lng:"116.368993",lat:"39.944032"}
+        },
+        {
+            123:{lng:"116.379341",lat:"39.948776"},
+            124:{lng:"116.402625",lat:"39.953091"},
+            125:{lng:"116.373807",lat:"39.963103"},
+            126:{lng:"116.40011",lat:"39.968357"},
+            127:{lng:"116.408518",lat:"39.968025"},
+            128:{lng:"116.364537",lat:"39.953755"}
+        }
+    ];
+    var index=0;
+    var nowPoint = {};
+    var nowMarker = {};
+
+    var map = new BMap.Map("map_canvas");
+    var point = new BMap.Point(116.379341, 39.938776);
+    map.centerAndZoom(point, 15);
+    // 初始化
+    for (var n in pointArr[0]) {
+        var myIcon = new BMap.Icon("http://developer.baidu.com/map/jsdemo/img/car.png", new BMap.Size(52,26));
+        nowPoint[n] = new BMap.Point(pointArr[0][n].lng,pointArr[0][n].lat);
+        nowMarker[n] = new BMap.Marker(nowPoint[n], {icon:myIcon});
+        map.addOverlay(nowMarker[n]);
+    }
+    // 下一个
+    function nextOne(){
+        index+=1;
+        if(index>2){return}
+        for (var n in pointArr[index]) {
+            var point = new BMap.Point(pointArr[index][n].lng,pointArr[index][n].lat);
+            console.log(nowPoint[n])
+            if (!pointArr[index][n]) {return;}
+            // nowPoint[n].setPosition(new BMap.Point(pointArr[1][n].lng,pointArr[1][n].lat));
+            _move(nowPoint[n], point, nowMarker[n]);
+            nowPoint[n] = point;
+        }
+    };
+    function _move(initPos,targetPos, nowMarker){
+
+        var me = this,
+            //当前的帧数
+            currentCount = 0,
+            //步长，米/秒
+            timer = 10,
+            step = 400 / (1000 / timer),
+            //初始坐标
+            init_pos = map.getMapType().getProjection().lngLatToPoint(initPos),
+            //获取结束点的(x,y)坐标
+            target_pos = map.getMapType().getProjection().lngLatToPoint(targetPos),
+            //总的步长
+            count = Math.round(_getDistance(init_pos, target_pos) / step);
+            console.log(count);
+
+            var pointsArr=[initPos,targetPos];  //点数组
+            this.map.addOverlay(new BMap.Polyline(pointsArr, { 
+                strokeColor : "#111", 
+                strokeWeight : 5, 
+                strokeOpacity : 0.5 
+            })); // 画线 
+
+
+            //如果小于1直接移动到下一点
+            // if (count < 1) {
+            //     me._moveNext(++me.i);
+            //     return;
+            // }
+            //两点之间匀速移动
+            me._intervalFlag = setInterval(function() {
+            //两点之间当前帧数大于总帧数的时候，则说明已经完成移动
+                if (currentCount >= count) {
+                    clearInterval(me._intervalFlag);
+                    return;
+                    //移动的点已经超过总的长度
+                    // if(me.i > me._path.length){
+                    //     return;
+                    // }
+                    //运行下一个点
+                    // me._moveNext(++me.i);
+                }else {
+                        currentCount++;
+                        var x = tweenLinear(init_pos.x, target_pos.x, currentCount, count),
+                            y = tweenLinear(init_pos.y, target_pos.y, currentCount, count),
+                            pos = map.getMapType().getProjection().pointToLngLat(new BMap.Pixel(x, y));
+                        //设置marker
+                        if(currentCount == 1){
+                            var proPos = null;
+                            // if(me.i - 1 >= 0){
+                            //     proPos = me._path[me.i - 1];
+                            // }
+                            setRotation(proPos,initPos,targetPos, nowMarker);
+                        }
+                        //正在移动
+
+                        nowMarker.setPosition(pos);
+                        //设置自定义overlay的位置
+                        // me._setInfoWin(pos);
+
+                        
+
+                        
+                    }
+            },timer);
+    }
+
+    /**
+     * 计算两点间的距离
+     * @param {Point} poi 经纬度坐标A点.
+     * @param {Point} poi 经纬度坐标B点.
+     * @return 无返回值.
+     */
+    function _getDistance(pxA, pxB) {
+        return Math.sqrt(Math.pow(pxA.x - pxB.x, 2) + Math.pow(pxA.y - pxB.y, 2));
+    };
+
+    /**
+    *在每个点的真实步骤中设置小车转动的角度
+    */
+    function setRotation(prePos,curPos,targetPos, nowMarker){
+        var me = this;
+        var deg = 0;
+        //start!
+        curPos =  map.pointToPixel(curPos);
+        targetPos =  map.pointToPixel(targetPos);   
+
+        if(targetPos.x != curPos.x){
+                var tan = (targetPos.y - curPos.y)/(targetPos.x - curPos.x),
+                atan  = Math.atan(tan);
+                deg = atan*360/(2*Math.PI);
+                //degree  correction;
+                if(targetPos.x < curPos.x){
+                    deg = -deg + 90 + 90;
+
+                } else {
+                    deg = -deg;
+                }
+
+                nowMarker.setRotation(-deg);   
+
+        }else {
+                var disy = targetPos.y- curPos.y ;
+                var bias = 0;
+                if(disy > 0)
+                    bias=-1
+                else
+                    bias = 1
+                nowMarker.setRotation(-bias * 90);  
+        }
+        return;
+
+    }
+
+    // 缓动效果 : 初始坐标，目标坐标，当前的步长，总的步长
+    function tweenLinear(initPos, targetPos, currentCount, count) {
+        var b = initPos, c = targetPos - initPos, t = currentCount,
+            d = count;
+        return c * t / d + b;
+    }
+
+</script>
+</body>
+</html>
